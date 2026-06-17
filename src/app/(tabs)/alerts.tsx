@@ -20,9 +20,9 @@ export default function RequestsScreen() {
   const [activeFilter, setActiveFilter] = useState<UrgencyFilter>('All');
   const router = useRouter();
 
-  const headerOpacity = useRef(new Animated.Value(0)).current;
-  const headerSlide   = useRef(new Animated.Value(-16)).current;
-  const listOpacity   = useRef(new Animated.Value(0)).current;
+  const [headerOpacity] = useState(() => new Animated.Value(0));
+  const [headerSlide]   = useState(() => new Animated.Value(-16));
+  const [listOpacity]   = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     fetchBloodRequests();
@@ -176,7 +176,7 @@ export default function RequestsScreen() {
                 {/* Additional notes */}
                 {req.additionalNotes && (
                   <Text style={styles.notes} numberOfLines={2}>
-                    "{req.additionalNotes}"
+                    {"“"}{req.additionalNotes}{"”"}
                   </Text>
                 )}
               </View>

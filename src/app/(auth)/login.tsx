@@ -30,9 +30,9 @@ export default function LoginScreen() {
   const [forgotCredential, setForgotCredential] = useState('');
 
   // Entrance animation
-  const formSlide = useRef(new Animated.Value(40)).current;
-  const formOpacity = useRef(new Animated.Value(0)).current;
-  const heroScale = useRef(new Animated.Value(1.05)).current;
+  const [formSlide] = useState(() => new Animated.Value(40));
+  const [formOpacity] = useState(() => new Animated.Value(0));
+  const [heroScale] = useState(() => new Animated.Value(1.05));
 
   useEffect(() => {
     Animated.parallel([

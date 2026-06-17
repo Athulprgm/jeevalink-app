@@ -3,7 +3,7 @@
  * Used as placeholder while content loads.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, View, StyleSheet, type ViewStyle } from 'react-native';
 
 interface SkeletonProps {
@@ -14,7 +14,7 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style }: SkeletonProps) {
-  const shimmer = useRef(new Animated.Value(0)).current;
+  const [shimmer] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const animation = Animated.loop(

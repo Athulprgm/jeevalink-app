@@ -11,9 +11,9 @@ const AVAILABILITY_OPTIONS = ['All', 'Available', 'Donated Recently'];
 
 /** Animated donor card entrance */
 function DonorCard({ donor, index }: { donor: User; index: number }) {
-  const slide  = useRef(new Animated.Value(40)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale  = useRef(new Animated.Value(1)).current;
+  const [slide]   = useState(() => new Animated.Value(40));
+  const [opacity] = useState(() => new Animated.Value(0));
+  const [scale]   = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     Animated.sequence([
@@ -109,8 +109,8 @@ export default function FindDonorsScreen() {
   const [districtFilter, setDistrictFilter] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
 
-  const headerOpacity = useRef(new Animated.Value(0)).current;
-  const headerSlide   = useRef(new Animated.Value(-16)).current;
+  const [headerOpacity] = useState(() => new Animated.Value(0));
+  const [headerSlide]   = useState(() => new Animated.Value(-16));
 
   useEffect(() => {
     Animated.parallel([

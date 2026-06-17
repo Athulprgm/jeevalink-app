@@ -3,7 +3,7 @@
  * Supports: primary gradient, secondary ghost, glass variant, pill shape.
  */
 
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import {
   TouchableOpacity,
   Text,
@@ -40,7 +40,7 @@ export function Button({
   onPress,
   ...props
 }: ButtonProps) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(1));
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {

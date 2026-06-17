@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { shadows, shadow } from '../../utils/shadow';
 import { Button } from '@/components/ui/button';
 import { Badge, urgencyToVariant } from '@/components/ui/badge';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 
 const getDaysUntilEligible = (lastDonated?: string): number | null => {
   if (!lastDonated) return null;
@@ -29,8 +29,8 @@ function StatCard({
   label: string;
   delay: number;
 }) {
-  const scale = useRef(new Animated.Value(0.8)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  const [scale] = useState(() => new Animated.Value(0.8));
+  const [opacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.sequence([
@@ -64,11 +64,11 @@ export default function DonorDashboard() {
   const isEligible = eligibleIn === null || eligibleIn <= 0;
 
   // Section entrance
-  const headerSlide = useRef(new Animated.Value(-20)).current;
-  const headerOpacity = useRef(new Animated.Value(0)).current;
-  const cardSlide = useRef(new Animated.Value(30)).current;
-  const cardOpacity = useRef(new Animated.Value(0)).current;
-  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const [headerSlide] = useState(() => new Animated.Value(-20));
+  const [headerOpacity] = useState(() => new Animated.Value(0));
+  const [cardSlide] = useState(() => new Animated.Value(30));
+  const [cardOpacity] = useState(() => new Animated.Value(0));
+  const [contentOpacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.parallel([
@@ -177,7 +177,7 @@ export default function DonorDashboard() {
                 <CheckCircle color="#16A34A" size={22} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.eligibleTitle}>You're Eligible to Donate!</Text>
+                <Text style={styles.eligibleTitle}>{"You're Eligible to Donate!"}</Text>
                 <Text style={styles.eligibleSubtitle}>Your next donation can save up to 3 lives.</Text>
               </View>
               <ChevronRight color="#16A34A" size={16} />
@@ -236,7 +236,7 @@ export default function DonorDashboard() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.tipTitle}>Your impact this year</Text>
-            <Text style={styles.tipSubtitle}>You've helped {currentUser?.livesSaved} people. Keep going!</Text>
+            <Text style={styles.tipSubtitle}>{"You've helped"} {currentUser?.livesSaved} {"people. Keep going!"}</Text>
           </View>
           <ChevronRight color="#94A3B8" size={16} />
         </TouchableOpacity>

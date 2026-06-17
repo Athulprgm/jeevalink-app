@@ -45,8 +45,8 @@ export function Input({
   ...props
 }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const labelAnim = useRef(new Animated.Value(0)).current;
+  const [glowAnim] = useState(() => new Animated.Value(0));
+  const [labelAnim] = useState(() => new Animated.Value(0));
 
   const handleFocus = (e: any) => {
     setIsFocused(true);

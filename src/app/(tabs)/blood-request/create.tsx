@@ -57,6 +57,7 @@ export default function CreateBloodRequestScreen() {
   const router = useRouter();
   const { createBloodRequest, currentUser } = useAppStore();
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [urgencyLevel, setUrgencyLevel] = useState<'Normal' | 'Urgent' | 'Emergency SOS'>('Normal');
   const [patientName, setPatientName] = useState('');
@@ -66,32 +67,51 @@ export default function CreateBloodRequestScreen() {
   const [hospitalAddress, setHospitalAddress] = useState(
     currentUser?.address || ''
   );
-  const [requiredByDate, setRequiredByDate] = useState('');
+  const [city, setCity] = useState(currentUser?.city || '');
+  const [district, setDistrict] = useState(currentUser?.district || '');
+
+  const getTomorrowDateString = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
+  const [requiredByDate, setRequiredByDate] = useState(getTomorrowDateString());
   const [contactPerson, setContactPerson] = useState('');
   const [contactMobile, setContactMobile] = useState(currentUser?.mobile || '');
   const [notes, setNotes] = useState('');
 
-  const isValid = patientName.trim() && bloodGroup && hospitalName.trim();
+  const isValid =
+    patientName.trim() &&
+    bloodGroup &&
+    hospitalName.trim() &&
+    city.trim() &&
+    district.trim() &&
+    requiredByDate.trim();
 
   const handleSubmit = async () => {
     if (!isValid || loading) return;
     setLoading(true);
+    setErrorMessage(null);
     const result = await createBloodRequest({
       patientName,
       bloodGroup,
       unitsRequired: parseInt(units, 10) || 1,
       hospitalName,
       hospitalAddress,
-      location: currentUser?.city || 'Unknown',
+      city,
+      district,
+      location: city ? `${city}, ${district}` : (currentUser?.city || 'Unknown'),
       contactNumber: contactMobile,
       contactPersonName: contactPerson,
-      requiredByDate: requiredByDate || undefined,
+      requiredByDate: requiredByDate,
       urgencyLevel,
       additionalNotes: notes,
     });
     setLoading(false);
     if (result.success) {
       router.back();
+    } else {
+      setErrorMessage(result.error || 'Failed to create request.');
     }
   };
 
@@ -185,11 +205,21 @@ export default function CreateBloodRequestScreen() {
           value={hospitalAddress}
           onChange={setHospitalAddress}
         />
+        <InputField
+          placeholder="City *"
+          value={city}
+          onChange={setCity}
+        />
+        <InputField
+          placeholder="District *"
+          value={district}
+          onChange={setDistrict}
+        />
 
         {/* Date Required */}
-        <SectionLabel>Date Required</SectionLabel>
+        <SectionLabel>Date Required *</SectionLabel>
         <InputField
-          placeholder="YYYY-MM-DD (e.g. 2024-12-20)"
+          placeholder="YYYY-MM-DD (e.g. 2024-12-20) *"
           value={requiredByDate}
           onChange={setRequiredByDate}
         />
@@ -219,6 +249,11 @@ export default function CreateBloodRequestScreen() {
         />
 
         {/* Submit */}
+        {errorMessage && (
+          <Text className="text-red-600 text-[14px] font-semibold mb-4 text-center">
+            {errorMessage}
+          </Text>
+        )}
         <Button
           label={isValid ? 'Submit Request' : 'Fill Required Fields'}
           disabled={!isValid}

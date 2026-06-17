@@ -42,6 +42,7 @@ export interface BloodRequest {
   additionalNotes?: string;
   status: 'Pending' | 'Fulfilled';
   createdAt: string;
+  verified?: boolean;
 }
 
 export interface AppNotification {
@@ -69,14 +70,16 @@ interface AppState {
   loadProfile: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<{ success: boolean; error?: string }>;
   toggleAvailability: () => Promise<void>;
+  registerPushToken: (pushToken: string) => Promise<void>;
   
   // Blood requests
   bloodRequests: BloodRequest[];
-  fetchBloodRequests: () => Promise<void>;
+  fetchBloodRequests: (params?: { verified?: boolean | string; status?: string; bloodGroup?: string; district?: string }) => Promise<void>;
   addBloodRequest: (request: BloodRequest) => void;
   createBloodRequest: (requestData: any) => Promise<{ success: boolean; error?: string }>;
   updateBloodRequest: (id: string, updates: Partial<BloodRequest>) => void;
   fulfillBloodRequest: (id: string) => Promise<{ success: boolean; error?: string }>;
+  verifyBloodRequest: (id: string) => Promise<{ success: boolean; error?: string }>;
   
   // Notifications
   notifications: AppNotification[];
@@ -96,12 +99,11 @@ interface AppState {
 
 export const isProfileComplete = (user: User | null): boolean => {
   if (!user) return false;
-  return !!(
-    user.fullName &&
-    user.bloodGroup &&
-    user.city &&
-    user.district
-  );
+  const basicComplete = !!(user.fullName && user.city && user.district);
+  if (user.role === 'volunteer') {
+    return basicComplete;
+  }
+  return basicComplete && !!user.bloodGroup && user.bloodGroup !== 'N/A';
 };
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -165,7 +167,7 @@ export const useAppStore = create<AppState>()(
           const res = await api.get('/auth/me');
           const { user } = res.data.data;
           set({ currentUser: user, loading: false });
-        } catch (err) {
+        } catch {
           set({ loading: false });
         }
       },
@@ -200,12 +202,21 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      // Blood requests actions
-      bloodRequests: [],
-      fetchBloodRequests: async () => {
+      registerPushToken: async (pushToken) => {
         if (!get().token) return;
         try {
-          const res = await api.get('/requests');
+          await api.post('/auth/push-token', { push_token: pushToken });
+        } catch (err: any) {
+          if (err?.response?.status !== 401) console.error('Failed to register push token', err);
+        }
+      },
+
+      // Blood requests actions
+      bloodRequests: [],
+      fetchBloodRequests: async (params) => {
+        if (!get().token) return;
+        try {
+          const res = await api.get('/requests', { params });
           if (res.data.success) {
             set({ bloodRequests: res.data.data.requests || [] });
           }
@@ -254,6 +265,25 @@ export const useAppStore = create<AppState>()(
           return { success: false };
         } catch (err: any) {
           const errMsg = err.response?.data?.message || 'Failed to fulfill request.';
+          return { success: false, error: errMsg };
+        }
+      },
+
+      verifyBloodRequest: async (id) => {
+        try {
+          const res = await api.patch(`/requests/${id}/verify`);
+          if (res.data.success) {
+            const updatedReq = res.data.data.request;
+            set((state) => ({
+              bloodRequests: state.bloodRequests.map((r) =>
+                r._id === id ? updatedReq : r
+              ),
+            }));
+            return { success: true };
+          }
+          return { success: false };
+        } catch (err: any) {
+          const errMsg = err.response?.data?.message || 'Failed to verify request.';
           return { success: false, error: errMsg };
         }
       },

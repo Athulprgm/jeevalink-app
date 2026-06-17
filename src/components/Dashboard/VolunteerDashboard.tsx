@@ -1,14 +1,70 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useAppStore } from '../../store/useAppStore';
 import { ShieldCheck, Users, MapPin, CheckCircle, XCircle, Calendar, Award } from 'lucide-react-native';
 import { shadow } from '../../utils/shadow';
+import { useEffect, useState } from 'react';
+import api from '../../store/api';
 
-
-const MOCK_PENDING_VERIFICATIONS: any[] = [];
 const MOCK_DRIVES: any[] = [];
 
 export default function VolunteerDashboard() {
-  const { currentUser } = useAppStore();
+  const { currentUser, bloodRequests, fetchBloodRequests, verifyBloodRequest } = useAppStore();
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await fetchBloodRequests({ verified: 'false' });
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
+  const handleApprove = async (id: string) => {
+    try {
+      const res = await verifyBloodRequest(id);
+      if (res.success) {
+        Alert.alert('Success', 'Blood request verified and published!');
+        fetchBloodRequests({ verified: 'false' });
+      } else {
+        Alert.alert('Error', res.error || 'Failed to verify request.');
+      }
+    } catch {
+      Alert.alert('Error', 'An unexpected error occurred.');
+    }
+  };
+
+  const handleReject = (id: string) => {
+    Alert.alert(
+      'Reject Request',
+      'Are you sure you want to reject and delete this request from the platform?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject & Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await api.delete(`/requests/${id}`);
+              if (res.data.success) {
+                Alert.alert('Success', 'Request deleted successfully.');
+                fetchBloodRequests({ verified: 'false' });
+              } else {
+                Alert.alert('Error', 'Failed to delete request.');
+              }
+            } catch (err: any) {
+              const msg = err.response?.data?.message || 'You do not have permission to delete this request.';
+              Alert.alert('Error', msg);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const pendingVerifications = bloodRequests.filter(
+    (req) => !req.verified && req.status === 'Pending'
+  );
 
   return (
     <ScrollView className="flex-1 bg-slate-50 pt-12" showsVerticalScrollIndicator={false}>
@@ -66,31 +122,42 @@ export default function VolunteerDashboard() {
       {/* Pending Verifications */}
       <View className="px-6 mb-8">
         <Text className="text-xl font-black text-slate-900 mb-6">Pending Verifications</Text>
-        {MOCK_PENDING_VERIFICATIONS.length === 0 ? (
+        {loading ? (
+          <ActivityIndicator color="#8B5CF6" size="large" className="my-8" />
+        ) : pendingVerifications.length === 0 ? (
           <View className="bg-white rounded-[24px] p-6 border border-slate-100 shadow-sm items-center">
             <Text className="text-slate-400 font-semibold text-sm">No pending verifications</Text>
           </View>
         ) : (
-          MOCK_PENDING_VERIFICATIONS.map((item) => (
-            <View key={item.id} className="bg-white rounded-[24px] p-5 mb-4 border border-slate-100 shadow-sm">
+          pendingVerifications.map((req) => (
+            <View key={req._id} className="bg-white rounded-[24px] p-5 mb-4 border border-slate-100 shadow-sm">
               <View className="flex-row justify-between items-start mb-4">
                 <View className="flex-1 mr-4">
-                  <Text className="font-bold text-slate-900">{item.name}</Text>
-                  <View className="bg-purple-50 self-start px-2 py-0.5 rounded-full mt-2">
-                    <Text className="text-purple-700 text-xs font-semibold">{item.type}</Text>
+                  <Text className="font-black text-slate-900 text-base">
+                    Patient: {req.patientName} ({req.bloodGroup}, {req.unitsRequired} Units)
+                  </Text>
+                  <Text className="text-slate-500 text-sm mt-1">Hospital: {req.hospitalName}</Text>
+                  <View className="bg-purple-50 self-start px-2 py-0.5 rounded-full mt-2 flex-row items-center">
+                    <Text className="text-purple-700 text-xs font-semibold">{req.urgencyLevel}</Text>
                   </View>
                   <View className="flex-row items-center mt-3">
                     <MapPin color="#94a3b8" size={14} />
-                    <Text className="text-slate-500 text-xs ml-1.5">{item.location}</Text>
+                    <Text className="text-slate-500 text-xs ml-1.5">{req.location}</Text>
                   </View>
                 </View>
               </View>
               <View className="flex-row gap-3">
-                <TouchableOpacity className="flex-1 flex-row items-center justify-center bg-emerald-50 border border-emerald-100 py-3 rounded-2xl">
+                <TouchableOpacity
+                  className="flex-1 flex-row items-center justify-center bg-emerald-50 border border-emerald-100 py-3 rounded-2xl"
+                  onPress={() => handleApprove(req._id)}
+                >
                   <CheckCircle color="#16A34A" size={16} />
                   <Text className="text-emerald-700 font-bold text-sm ml-1.5">Approve</Text>
                 </TouchableOpacity>
-                <TouchableOpacity className="flex-1 flex-row items-center justify-center bg-red-50 border border-red-100 py-3 rounded-2xl">
+                <TouchableOpacity
+                  className="flex-1 flex-row items-center justify-center bg-red-50 border border-red-100 py-3 rounded-2xl"
+                  onPress={() => handleReject(req._id)}
+                >
                   <XCircle color="#DC2626" size={16} />
                   <Text className="text-red-600 font-bold text-sm ml-1.5">Reject</Text>
                 </TouchableOpacity>

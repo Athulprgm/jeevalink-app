@@ -71,6 +71,13 @@ export function toSnake(obj: any): any {
 }
 
 const getBaseURL = () => {
+  // Set to false to test against a local Laravel server
+  const USE_PRODUCTION = true;
+
+  if (USE_PRODUCTION) {
+    return 'https://mindful-exploration-production-8f55.up.railway.app/api/v1';
+  }
+
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:8000/api/v1';
   }
@@ -87,6 +94,7 @@ const api = axios.create({
 // Request interceptor to add token
 api.interceptors.request.use(
   (config) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { useAppStore } = require('./useAppStore');
     const token = useAppStore.getState().token;
     if (token) {
@@ -114,6 +122,7 @@ api.interceptors.response.use(
   (error) => {
     // If we get an authentication error, clean up token
     if (error.response && error.response.status === 401) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { useAppStore } = require('./useAppStore');
       useAppStore.getState().logout();
     }

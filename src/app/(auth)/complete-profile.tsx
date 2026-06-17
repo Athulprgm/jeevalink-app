@@ -7,7 +7,6 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,8 +17,9 @@ import { Input } from '@/components/ui/input';
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export default function CompleteProfileScreen() {
-  const { currentUser, updateUser } = useAppStore();
-  const router = useRouter();
+  const { currentUser, updateProfile } = useAppStore();
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [profilePicture, setProfilePicture] = useState(currentUser?.profilePicture || '');
   const [bloodGroup, setBloodGroup] = useState(currentUser?.bloodGroup || '');
@@ -39,17 +39,24 @@ export default function CompleteProfileScreen() {
     }
   };
 
-  const handleSave = () => {
-    updateUser({
-      profilePicture,
-      bloodGroup,
+  const handleSave = async () => {
+    if (loading) return;
+    setLoading(true);
+    setErrorMessage(null);
+    const result = await updateProfile({
+      profilePicture: profilePicture || undefined,
+      bloodGroup: currentUser?.role === 'volunteer' ? 'N/A' : bloodGroup,
       city,
       district,
     });
-    // The layout effect will automatically route to /(tabs) when isProfileComplete becomes true
+    setLoading(false);
+    if (!result.success) {
+      setErrorMessage(result.error || 'Failed to update profile.');
+    }
   };
 
-  const canSave = !!(bloodGroup && city && district);
+  const isVolunteer = currentUser?.role === 'volunteer';
+  const canSave = !!(city && district && (isVolunteer || (bloodGroup && bloodGroup !== 'N/A')));
 
   return (
     <KeyboardAvoidingView
@@ -78,19 +85,23 @@ export default function CompleteProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Blood Group Picker */}
-          <Text className="text-slate-500 text-[13px] font-semibold mb-3 ml-1 uppercase tracking-wider">Blood Group</Text>
-          <View className="flex-row flex-wrap mb-6 gap-3">
-            {BLOOD_GROUPS.map((bg) => (
-              <TouchableOpacity
-                key={bg}
-                className={`px-5 py-3 rounded-[16px] border ${bloodGroup === bg ? 'bg-red-600 border-red-600' : 'bg-white border-slate-100'}`}
-                onPress={() => setBloodGroup(bg)}
-              >
-                <Text className={`font-bold text-[15px] ${bloodGroup === bg ? 'text-white' : 'text-slate-700'}`}>{bg}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {/* Blood Group Picker for Donors */}
+          {!isVolunteer && (
+            <>
+              <Text className="text-slate-500 text-[13px] font-semibold mb-3 ml-1 uppercase tracking-wider">Blood Group</Text>
+              <View className="flex-row flex-wrap mb-6 gap-3">
+                {BLOOD_GROUPS.map((bg) => (
+                  <TouchableOpacity
+                    key={bg}
+                    className={`px-5 py-3 rounded-[16px] border ${bloodGroup === bg ? 'bg-red-600 border-red-600' : 'bg-white border-slate-100'}`}
+                    onPress={() => setBloodGroup(bg)}
+                  >
+                    <Text className={`font-bold text-[15px] ${bloodGroup === bg ? 'text-white' : 'text-slate-700'}`}>{bg}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
           <Input
             placeholder="City"
@@ -104,11 +115,18 @@ export default function CompleteProfileScreen() {
             onChangeText={setDistrict}
           />
 
+          {errorMessage && (
+            <Text className="text-red-600 text-sm font-semibold mb-4 text-center">
+              {errorMessage}
+            </Text>
+          )}
+
           <Button
             label="Save Profile"
             disabled={!canSave}
+            loading={loading}
             onPress={handleSave}
-            leftIcon={<Save color={canSave ? '#fff' : '#94A3B8'} size={18} />}
+            leftIcon={canSave ? <Save color="#fff" size={18} /> : undefined}
             style={{ marginTop: 20 }}
           />
         </View>

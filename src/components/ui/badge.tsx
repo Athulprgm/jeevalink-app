@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
+import { Siren, BellRing, ShieldCheck, CheckCircle } from 'lucide-react-native';
 
 export type BadgeVariant =
   | 'emergency'
@@ -24,15 +25,27 @@ interface BadgeConfig {
 }
 
 const BADGE_CONFIG: Record<BadgeVariant, BadgeConfig> = {
-  emergency: { bg: '#FEF2F2', text: '#DC2626', dot: '#DC2626', label: '🚨 Emergency SOS' },
-  urgent:    { bg: '#FFFBEB', text: '#D97706', dot: '#F59E0B', label: '⚡ Urgent' },
-  normal:    { bg: '#ECFDF5', text: '#059669', dot: '#10B981', label: '✅ Normal' },
-  fulfilled: { bg: '#ECFDF5', text: '#059669', dot: '#10B981', label: '✓ Fulfilled' },
+  emergency: { bg: '#FEF2F2', text: '#DC2626', dot: '#DC2626', label: 'Emergency SOS' },
+  urgent:    { bg: '#FFFBEB', text: '#D97706', dot: '#F59E0B', label: 'Urgent' },
+  normal:    { bg: '#ECFDF5', text: '#059669', dot: '#10B981', label: 'Normal' },
+  fulfilled: { bg: '#ECFDF5', text: '#059669', dot: '#10B981', label: 'Fulfilled' },
   available: { bg: '#ECFDF5', text: '#059669', dot: '#10B981', label: 'Available' },
   unavailable: { bg: '#FFF7ED', text: '#D97706', dot: '#F59E0B', label: 'Donated Recently' },
   points:    { bg: '#FEF3C7', text: '#D97706', dot: '#F59E0B', label: '' },
   role:      { bg: '#EFF6FF', text: '#2563EB', dot: '#3B82F6', label: '' },
 };
+
+const BADGE_ICON: Partial<Record<BadgeVariant, React.ReactNode>> = {};
+
+function getBadgeIcon(variant: BadgeVariant, color: string, size: number): React.ReactNode | null {
+  switch (variant) {
+    case 'emergency': return <Siren color={color} size={size} strokeWidth={2.2} />;
+    case 'urgent':    return <BellRing color={color} size={size} strokeWidth={2.2} />;
+    case 'normal':    return <ShieldCheck color={color} size={size} strokeWidth={2.2} />;
+    case 'fulfilled': return <CheckCircle color={color} size={size} strokeWidth={2.2} />;
+    default:          return null;
+  }
+}
 
 export interface BadgeProps {
   variant: BadgeVariant;
@@ -46,6 +59,8 @@ export function Badge({ variant, label, showDot = true, size = 'sm', pulse = fal
   const config = BADGE_CONFIG[variant];
   const displayLabel = label || config.label;
   const [pulseAnim] = React.useState(() => new Animated.Value(1));
+  const iconSize = size === 'md' ? 13 : 11;
+  const badgeIcon = getBadgeIcon(variant, config.text, iconSize);
 
   React.useEffect(() => {
     if (!pulse) return;
@@ -69,7 +84,10 @@ export function Badge({ variant, label, showDot = true, size = 'sm', pulse = fal
         isLarge && styles.badgeLarge,
       ]}
     >
-      {showDot && (
+      {/* Use lucide icon if available, otherwise fall back to animated dot */}
+      {badgeIcon ? (
+        <View style={styles.iconWrap}>{badgeIcon}</View>
+      ) : showDot ? (
         <Animated.View
           style={[
             styles.dot,
@@ -78,7 +96,7 @@ export function Badge({ variant, label, showDot = true, size = 'sm', pulse = fal
             pulse && { transform: [{ scale: pulseAnim }] },
           ]}
         />
-      )}
+      ) : null}
       <Text
         style={[
           styles.label,
@@ -105,9 +123,10 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 999,
+    gap: 4,
   },
   badgeLarge: {
     paddingHorizontal: 12,
@@ -125,10 +144,15 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   labelLarge: {
     fontSize: 13,
+  },
+  iconWrap: {
+    marginRight: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

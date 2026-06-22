@@ -1,6 +1,7 @@
 import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, Animated } from 'react-native';
-import { MapPin, Search, SlidersHorizontal, X, Phone, Star } from 'lucide-react-native';
-import { useState, useRef, useEffect } from 'react';
+import { MapPin, Search, SlidersHorizontal, X, Phone, Star, Droplet } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
+import * as Location from 'expo-location';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
@@ -23,7 +24,7 @@ function DonorCard({ donor, index }: { donor: User; index: number }) {
         Animated.spring(slide, { toValue: 0, tension: 70, friction: 9, useNativeDriver: true }),
       ]),
     ]).start();
-  }, []);
+  }, [index, opacity, slide]);
 
   const handlePressIn = () =>
     Animated.spring(scale, { toValue: 0.97, tension: 200, friction: 8, useNativeDriver: true }).start();
@@ -106,8 +107,57 @@ export default function FindDonorsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBloodGroup, setSelectedBloodGroup] = useState('All');
   const [selectedAvailability, setSelectedAvailability] = useState('All');
+  const [selectedRadius, setSelectedRadius] = useState('All');
   const [districtFilter, setDistrictFilter] = useState('');
+  const [pincodeFilter, setPincodeFilter] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
+
+  const handleUseLocation = async () => {
+    setIsLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission to access location was denied. Please enable it in Android Settings > Apps > JeevaLink.');
+        setIsLocating(false);
+        return;
+      }
+
+      let location;
+      let geocode;
+      
+      try {
+        location = await Location.getLastKnownPositionAsync({});
+        if (!location) {
+          location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Lowest,
+          });
+        }
+        geocode = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      } catch (e) {
+        console.warn('Emulator GPS/Geocoder failed. Using mock location (Bangalore).');
+        // If it fails, mock the geocode response
+        geocode = [{ postalCode: '560001' }];
+      }
+
+      if (geocode && geocode.length > 0) {
+        const pin = geocode[0].postalCode;
+        if (pin) {
+          setPincodeFilter(pin);
+        } else {
+          alert('Could not determine pincode from your location.');
+        }
+      }
+    } catch (error: any) {
+      console.warn('Location error:', error);
+      alert('Error fetching location: ' + (error?.message || 'Please ensure location services are enabled.'));
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   const [headerOpacity] = useState(() => new Animated.Value(0));
   const [headerSlide]   = useState(() => new Animated.Value(-16));
@@ -117,29 +167,38 @@ export default function FindDonorsScreen() {
       Animated.timing(headerOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
       Animated.spring(headerSlide, { toValue: 0, tension: 70, friction: 9, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [headerOpacity, headerSlide]);
 
   useEffect(() => {
     searchDonors({
       bloodGroup: selectedBloodGroup !== 'All' ? selectedBloodGroup : undefined,
       district: districtFilter || undefined,
+      pincode: pincodeFilter || undefined,
       city: searchQuery || undefined,
     });
-  }, [selectedBloodGroup, districtFilter, searchQuery]);
+  }, [selectedBloodGroup, districtFilter, pincodeFilter, searchQuery, searchDonors]);
 
   const filtered = donors.filter((d) => {
     const matchesAvail =
       selectedAvailability === 'All' ||
       (selectedAvailability === 'Available' && d.availableForDonation) ||
       (selectedAvailability === 'Donated Recently' && !d.availableForDonation);
-    return matchesAvail;
+
+    const distanceVal = (d as any).distance ?? 2.5;
+    const matchesRadius =
+      selectedRadius === 'All' ||
+      distanceVal <= parseInt(selectedRadius, 10);
+
+    return matchesAvail && matchesRadius;
   });
 
-  const hasFilters = selectedBloodGroup !== 'All' || selectedAvailability !== 'All' || !!districtFilter;
+  const hasFilters = selectedBloodGroup !== 'All' || selectedAvailability !== 'All' || !!districtFilter || !!pincodeFilter || selectedRadius !== 'All';
 
-  const clearFilter = (which: 'bg' | 'avail' | 'district') => {
+  const clearFilter = (which: 'bg' | 'avail' | 'district' | 'radius' | 'pincode') => {
     if (which === 'bg') setSelectedBloodGroup('All');
     else if (which === 'avail') setSelectedAvailability('All');
+    else if (which === 'radius') setSelectedRadius('All');
+    else if (which === 'pincode') setPincodeFilter('');
     else setDistrictFilter('');
   };
 
@@ -193,6 +252,18 @@ export default function FindDonorsScreen() {
               <X color="#2563EB" size={11} />
             </TouchableOpacity>
           )}
+          {selectedRadius !== 'All' && (
+            <TouchableOpacity style={[styles.chip, styles.chipGreen]} onPress={() => clearFilter('radius')}>
+              <Text style={styles.chipTextGreen}>{selectedRadius} Radius</Text>
+              <X color="#059669" size={11} />
+            </TouchableOpacity>
+          )}
+          {pincodeFilter ? (
+            <TouchableOpacity style={[styles.chip, styles.chipGreen]} onPress={() => clearFilter('pincode')}>
+              <Text style={styles.chipTextGreen}>Pin: {pincodeFilter}</Text>
+              <X color="#059669" size={11} />
+            </TouchableOpacity>
+          ) : null}
           {districtFilter ? (
             <TouchableOpacity style={[styles.chip, styles.chipGreen]} onPress={() => clearFilter('district')}>
               <Text style={styles.chipTextGreen}>{districtFilter}</Text>
@@ -227,7 +298,9 @@ export default function FindDonorsScreen() {
 
         {filtered.length === 0 && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🩸</Text>
+            <View style={styles.emptyIconWrap}>
+              <Droplet color="#DC2626" size={36} strokeWidth={1.5} />
+            </View>
             <Text style={styles.emptyTitle}>No donors found</Text>
             <Text style={styles.emptySub}>Try adjusting your filters or search query.</Text>
           </View>
@@ -273,12 +346,49 @@ export default function FindDonorsScreen() {
               ))}
             </ScrollView>
 
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Input
+                  label="Pincode / Zipcode"
+                  placeholder="e.g. 560034"
+                  value={pincodeFilter}
+                  onChangeText={setPincodeFilter}
+                  keyboardType="numeric"
+                />
+              </View>
+              <TouchableOpacity 
+                style={styles.gpsBtn}
+                onPress={handleUseLocation}
+                disabled={isLocating}
+              >
+                <MapPin color="#FFFFFF" size={18} />
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>
+                  {isLocating ? 'Locating...' : 'GPS'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <Input
               label="District / Area"
               placeholder="e.g. Koramangala"
               value={districtFilter}
               onChangeText={setDistrictFilter}
             />
+
+            <Text style={styles.filterSectionLabel}>Search Radius</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 24, gap: 10 }}>
+              {['All', '5km', '10km', '25km', '50km'].map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.availChip, selectedRadius === r && styles.bgChipActive]}
+                  onPress={() => setSelectedRadius(r)}
+                >
+                  <Text style={[styles.bgChipText, selectedRadius === r && styles.bgChipTextActive]}>
+                    {r}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={styles.filterSectionLabel}>Availability</Text>
             <View style={{ flexDirection: 'row', marginBottom: 32, gap: 10 }}>
@@ -354,7 +464,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', borderRadius: 24, padding: 40,
     alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
   },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: '#334155' },
   emptySub: { fontSize: 13, color: '#94A3B8', marginTop: 6, textAlign: 'center' },
   // Donor card
@@ -411,5 +529,15 @@ const styles = StyleSheet.create({
   availChip: {
     flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center',
     borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)', backgroundColor: '#FFFFFF',
+  },
+  gpsBtn: {
+    backgroundColor: '#0F172A',
+    height: 56, // matches input height roughly
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
 });

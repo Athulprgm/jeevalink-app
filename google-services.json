@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "973036108976",
+    "project_id": "jeeva-link-4a280",
+    "storage_bucket": "jeeva-link-4a280.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:973036108976:android:f63d957c8fcccaf6b60f75",
+        "android_client_info": {
+          "package_name": "com.athulkrishnak.jeevalinkapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAylZbsosHz5H6gCVA2tm0kZI6k3WQCe08"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

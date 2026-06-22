@@ -1,11 +1,10 @@
-import { View, Text, Switch, ScrollView, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, Switch, ScrollView, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { useAppStore } from '../../store/useAppStore';
-import { Heart, Droplet, MapPin, Flame, AlertTriangle, CheckCircle, Bell, Plus, ChevronRight, TrendingUp } from 'lucide-react-native';
+import { Heart, Droplet, MapPin, Flame, AlertTriangle, CheckCircle, Bell, Plus, ChevronRight, TrendingUp, Clock } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { shadows, shadow } from '../../utils/shadow';
 import { Button } from '@/components/ui/button';
 import { Badge, urgencyToVariant } from '@/components/ui/badge';
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 const getDaysUntilEligible = (lastDonated?: string): number | null => {
   if (!lastDonated) return null;
@@ -19,18 +18,21 @@ const getDaysUntilEligible = (lastDonated?: string): number | null => {
 function StatCard({
   icon,
   iconBg,
+  borderColor,
   value,
   label,
   delay,
 }: {
   icon: React.ReactNode;
   iconBg: string;
+  borderColor: string;
   value: number;
   label: string;
   delay: number;
 }) {
   const [scale] = useState(() => new Animated.Value(0.8));
   const [opacity] = useState(() => new Animated.Value(0));
+  const pressScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.sequence([
@@ -40,25 +42,62 @@ function StatCard({
         Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
       ]),
     ]).start();
-  }, []);
+  }, [delay, opacity, scale]);
+
+  const handlePressIn = () => {
+    Animated.spring(pressScale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      tension: 150,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
-    <Animated.View style={[styles.statCard, { opacity, transform: [{ scale }] }]}>
-      <View style={[styles.statIcon, { backgroundColor: iconBg }]}>{icon}</View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </Animated.View>
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={{ flex: 1 }}
+    >
+      <Animated.View style={[styles.statCard, { opacity, transform: [{ scale: Animated.multiply(scale, pressScale) }] }]}>
+        <View style={[
+          styles.statIcon, 
+          { 
+            backgroundColor: iconBg, 
+            borderColor: borderColor, 
+            borderWidth: 1,
+            // Soft shadow for icon
+            shadowColor: borderColor,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 6,
+            elevation: 2,
+          }
+        ]}>{icon}</View>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
   );
 }
 
 export default function DonorDashboard() {
-  const { currentUser, toggleAvailability, bloodRequests, fetchBloodRequests, fetchNotifications } = useAppStore();
+  const { currentUser, toggleAvailability, bloodRequests, fetchBloodRequests, fetchNotifications, liveDonorCounts, fetchLiveCounts } = useAppStore();
   const router = useRouter();
 
   useEffect(() => {
     fetchBloodRequests();
     fetchNotifications();
-  }, []);
+    fetchLiveCounts();
+  }, [fetchBloodRequests, fetchLiveCounts, fetchNotifications]);
 
   const eligibleIn = getDaysUntilEligible(currentUser?.lastDonatedDate);
   const isEligible = eligibleIn === null || eligibleIn <= 0;
@@ -86,14 +125,15 @@ export default function DonorDashboard() {
       Animated.delay(350),
       Animated.timing(contentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [cardOpacity, cardSlide, contentOpacity, headerOpacity, headerSlide]);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 110 }}
-    >
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <ScrollView
+        style={styles.screen}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 180 }}
+      >
       {/* ─── Glass Header ─── */}
       <Animated.View
         style={[
@@ -105,7 +145,7 @@ export default function DonorDashboard() {
         <View>
           <Text style={styles.headerGreeting}>Welcome back,</Text>
           <Text style={styles.headerName} numberOfLines={1}>
-            {currentUser?.fullName} 👋
+            {currentUser?.fullName}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -200,6 +240,7 @@ export default function DonorDashboard() {
           <StatCard
             icon={<Heart color="#16A34A" size={20} fill="#16A34A" />}
             iconBg="#ECFDF5"
+            borderColor="#A7F3D0"
             value={currentUser?.livesSaved ?? 0}
             label="Lives Saved"
             delay={0}
@@ -207,17 +248,53 @@ export default function DonorDashboard() {
           <StatCard
             icon={<Droplet color="#DC2626" size={20} fill="#DC2626" />}
             iconBg="#FEF2F2"
+            borderColor="#FCA5A5"
             value={currentUser?.totalDonations ?? 0}
             label="Donations"
             delay={80}
           />
           <StatCard
-            icon={<Flame color="#F59E0B" size={20} />}
+            icon={<Flame color="#F59E0B" size={20} fill="#F59E0B" />}
             iconBg="#FFFBEB"
+            borderColor="#FDE68A"
             value={currentUser?.rewardPoints ?? 0}
             label="Points"
             delay={160}
           />
+        </View>
+
+        {/* ─── Live Donor Counts ─── */}
+        <View style={styles.section}>
+          <View style={styles.liveHeader}>
+            <Text style={styles.liveTitle}>Live Available Donors</Text>
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveIndicatorDot} />
+              <Text style={styles.liveIndicatorText}>LIVE</Text>
+            </View>
+          </View>
+          
+          <View style={styles.donorGrid}>
+            {Object.entries(liveDonorCounts).map(([bg, count]) => {
+              const hasActive = count > 0;
+              return (
+                <View
+                  key={bg}
+                  style={[
+                    styles.donorGridItem,
+                    hasActive && styles.donorGridItemActive,
+                  ]}
+                >
+                  <Text style={[styles.donorGridBG, hasActive && styles.donorGridBGActive]}>{bg}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    {hasActive && <View style={styles.liveGridDot} />}
+                    <Text style={[styles.donorGridCount, hasActive && styles.donorGridCountActive]}>
+                      {count} {hasActive ? 'live' : 'active'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
         </View>
 
         {/* ─── Quick Actions ─── */}
@@ -240,6 +317,18 @@ export default function DonorDashboard() {
           </View>
           <ChevronRight color="#94A3B8" size={16} />
         </TouchableOpacity>
+
+        {/* Shortcuts Row */}
+        <View style={styles.shortcutsRow}>
+          <TouchableOpacity
+            style={styles.shortcutBtn}
+            activeOpacity={0.8}
+            onPress={() => router.push('/(tabs)/blood-request/history')}
+          >
+            <Clock color="#DC2626" size={14} />
+            <Text style={styles.shortcutBtnText}>View Emergency History</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* ─── Urgent SOS Feed ─── */}
         <View style={[styles.section, { marginTop: 8 }]}>
@@ -298,6 +387,7 @@ export default function DonorDashboard() {
         </View>
       </Animated.View>
     </ScrollView>
+  </View>
   );
 }
 
@@ -506,12 +596,12 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    borderColor: 'rgba(0,0,0,0.04)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowRadius: 16,
+    elevation: 3,
   },
   statIcon: {
     width: 44,
@@ -608,4 +698,111 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   respondBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  // Live donor grid
+  liveHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  liveTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  liveIndicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#DC2626',
+  },
+  liveIndicatorText: {
+    color: '#DC2626',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  donorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  donorGridItem: {
+    flexBasis: '22%',
+    flexGrow: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  donorGridItemActive: {
+    backgroundColor: '#FFF5F5',
+    borderColor: 'rgba(220,38,38,0.12)',
+    borderWidth: 1,
+  },
+  donorGridBG: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#94A3B8',
+  },
+  donorGridBGActive: {
+    color: '#DC2626',
+  },
+  donorGridCount: {
+    fontSize: 10,
+    color: '#94A3B8',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  donorGridCountActive: {
+    color: '#EF4444',
+  },
+  liveGridDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22C55E',
+  },
+  // Shortcuts
+  shortcutsRow: {
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  shortcutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  shortcutBtnText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '700',
+  },
 });

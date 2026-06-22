@@ -149,7 +149,7 @@ export default function ProfileScreen() {
               <Text className="text-2xl font-black text-white">{currentUser?.fullName}</Text>
               <Text className="text-red-200 mt-1 text-sm">{currentUser?.email}</Text>
               <View className="bg-white/20 self-start mt-2 px-3 py-1 rounded-full">
-                <Text className="text-white font-bold text-xs capitalize">🩸 {currentUser?.role}</Text>
+                <Text className="text-white font-bold text-xs capitalize">{currentUser?.role}</Text>
               </View>
             </>
           )}

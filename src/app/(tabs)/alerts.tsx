@@ -1,40 +1,113 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { useAppStore } from '../../store/useAppStore';
-import { MapPin, Clock, CheckCircle, Plus, Droplet } from 'lucide-react-native';
-import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import {
+  MapPin,
+  Clock,
+  CheckCircle,
+  Plus,
+  Droplet,
+  Siren,
+  BellRing,
+  ShieldCheck,
+  LayoutList,
+  RefreshCw,
+} from 'lucide-react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Badge, urgencyToVariant } from '@/components/ui/badge';
 
 const URGENCY_TABS = ['All', 'Emergency SOS', 'Urgent', 'Normal'] as const;
 type UrgencyFilter = typeof URGENCY_TABS[number];
 
-const TAB_LABELS: Record<string, string> = {
-  'All': 'All',
-  'Emergency SOS': '🚨 SOS',
-  'Urgent': '⚡ Urgent',
-  'Normal': '✅ Normal',
+const TAB_DISPLAY: Record<string, { label: string; activeColor: string }> = {
+  'All':           { label: 'All',    activeColor: '#DC2626' },
+  'Emergency SOS': { label: 'SOS',    activeColor: '#DC2626' },
+  'Urgent':        { label: 'Urgent', activeColor: '#F59E0B' },
+  'Normal':        { label: 'Normal', activeColor: '#10B981' },
 };
 
 export default function RequestsScreen() {
-  const { bloodRequests, fulfillBloodRequest, fetchBloodRequests, currentUser } = useAppStore();
+  const {
+    bloodRequests,
+    fulfillBloodRequest,
+    fetchBloodRequests,
+    currentUser,
+    token,
+    _hasHydrated,
+  } = useAppStore();
+
   const [activeFilter, setActiveFilter] = useState<UrgencyFilter>('All');
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const router = useRouter();
+  const { requestId } = useLocalSearchParams<{ requestId?: string }>();
 
   const [headerOpacity] = useState(() => new Animated.Value(0));
   const [headerSlide]   = useState(() => new Animated.Value(-16));
   const [listOpacity]   = useState(() => new Animated.Value(0));
 
+  // Entrance animation (only once)
   useEffect(() => {
-    fetchBloodRequests();
     Animated.parallel([
       Animated.timing(headerOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.spring(headerSlide, { toValue: 0, tension: 70, friction: 9, useNativeDriver: true }),
+      Animated.spring(headerSlide,   { toValue: 0, tension: 70, friction: 9, useNativeDriver: true }),
     ]).start();
     Animated.sequence([
       Animated.delay(200),
       Animated.timing(listOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
     ]).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadData = useCallback(async (isRefresh = false) => {
+    // Wait until store has hydrated and token is available
+    if (!token) return;
+    if (isRefresh) {
+      setRefreshing(true);
+    } else if (bloodRequests.length === 0) {
+      setLoading(true);
+    }
+    setFetchError(null);
+    try {
+      // Fetch verified=true so only published requests are shown
+      await fetchBloodRequests({ verified: 'true' });
+    } catch {
+      setFetchError('Could not load requests. Pull down to retry.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token, bloodRequests.length, fetchBloodRequests]);
+
+  // Fetch when hydration completes and token becomes available
+  useEffect(() => {
+    if (_hasHydrated && token) {
+      loadData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_hasHydrated, token]);
+
+  // Re-fetch every time the tab is focused (catches stale data)
+  useFocusEffect(
+    useCallback(() => {
+      if (token) loadData();
+    }, [token, loadData])
+  );
+
+  // If a request ID is passed via deep link, show All so it is visible
+  useEffect(() => {
+    if (requestId) setActiveFilter('All');
+  }, [requestId]);
 
   const filtered =
     activeFilter === 'All'
@@ -42,6 +115,28 @@ export default function RequestsScreen() {
       : bloodRequests.filter((r) => r.urgencyLevel === activeFilter);
 
   const isVolunteer = currentUser?.role === 'volunteer';
+
+  // ─── Loading skeleton ────────────────────────────────────────────────────────
+  if (loading && bloodRequests.length === 0) {
+    return (
+      <View style={styles.screen}>
+        <Animated.View
+          style={[styles.header, { opacity: headerOpacity, transform: [{ translateY: headerSlide }] }]}
+        >
+          <View>
+            <Text style={styles.headerTitle}>Blood Requests</Text>
+            <Text style={styles.headerSub}>Loading…</Text>
+          </View>
+        </Animated.View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+          <ActivityIndicator size="large" color="#DC2626" />
+          <Text style={{ color: '#94A3B8', fontWeight: '600', fontSize: 14 }}>
+            Fetching latest requests…
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -53,14 +148,26 @@ export default function RequestsScreen() {
           <Text style={styles.headerTitle}>Blood Requests</Text>
           <Text style={styles.headerSub}>{filtered.length} active requests</Text>
         </View>
-        {currentUser && (
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {/* Refresh button */}
           <TouchableOpacity
-            style={styles.fabSmall}
-            onPress={() => router.push('/(tabs)/blood-request/create')}
+            style={[styles.fabSmall, { backgroundColor: '#F1F5F9' }]}
+            onPress={() => loadData(true)}
           >
-            <Plus color="#fff" size={22} strokeWidth={2.5} />
+            {refreshing
+              ? <ActivityIndicator size="small" color="#DC2626" />
+              : <RefreshCw color="#DC2626" size={18} strokeWidth={2.2} />
+            }
           </TouchableOpacity>
-        )}
+          {currentUser && (
+            <TouchableOpacity
+              style={styles.fabSmall}
+              onPress={() => router.push('/(tabs)/blood-request/create')}
+            >
+              <Plus color="#fff" size={22} strokeWidth={2.5} />
+            </TouchableOpacity>
+          )}
+        </View>
       </Animated.View>
 
       {/* ─── Urgency Filter Tabs ─── */}
@@ -70,32 +177,68 @@ export default function RequestsScreen() {
         style={{ flexGrow: 0, minHeight: 46, maxHeight: 46, marginBottom: 20 }}
         contentContainerStyle={{ paddingHorizontal: 24, gap: 10, alignItems: 'center' }}
       >
-        {URGENCY_TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeFilter === tab && styles.tabActive]}
-            onPress={() => setActiveFilter(tab)}
-          >
-            <Text style={[styles.tabText, activeFilter === tab && styles.tabTextActive]}>
-              {TAB_LABELS[tab]}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {URGENCY_TABS.map((tab) => {
+          const cfg = TAB_DISPLAY[tab];
+          const isActive = activeFilter === tab;
+          const TabIcon =
+            tab === 'Emergency SOS' ? Siren :
+            tab === 'Urgent'        ? BellRing :
+            tab === 'Normal'        ? ShieldCheck :
+            LayoutList;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[
+                styles.tab,
+                isActive && { backgroundColor: cfg.activeColor, borderColor: cfg.activeColor },
+              ]}
+              onPress={() => setActiveFilter(tab)}
+            >
+              <TabIcon color={isActive ? '#FFFFFF' : '#94A3B8'} size={13} strokeWidth={2.2} />
+              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                {cfg.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
+
+      {/* ─── Error Banner ─── */}
+      {fetchError && (
+        <TouchableOpacity
+          style={styles.errorBanner}
+          onPress={() => loadData(true)}
+        >
+          <RefreshCw color="#DC2626" size={14} />
+          <Text style={styles.errorBannerText}>{fetchError}</Text>
+        </TouchableOpacity>
+      )}
 
       {/* ─── Requests List ─── */}
       <Animated.ScrollView
         style={{ flex: 1, opacity: listOpacity }}
         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadData(true)}
+            colors={['#DC2626']}
+            tintColor="#DC2626"
+          />
+        }
       >
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !loading && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconWrap}>
               <Droplet color="#DC2626" size={36} strokeWidth={1.5} />
             </View>
             <Text style={styles.emptyTitle}>No requests found</Text>
-            <Text style={styles.emptySub}>Try selecting a different urgency filter.</Text>
+            <Text style={styles.emptySub}>
+              {activeFilter === 'All'
+                ? 'No blood requests at the moment. Check back soon.'
+                : `No ${activeFilter} requests. Try another filter.`}
+            </Text>
             <TouchableOpacity
               style={styles.emptyBtn}
               onPress={() => router.push('/(tabs)/blood-request/create')}
@@ -105,22 +248,30 @@ export default function RequestsScreen() {
           </View>
         )}
 
-        {filtered.map((req, idx) => {
-          const isEmergency = req.urgencyLevel === 'Emergency SOS';
-          const isFulfilled = req.status === 'Fulfilled';
+        {filtered.map((req) => {
+          const isEmergency  = req.urgencyLevel === 'Emergency SOS';
+          const isFulfilled  = req.status === 'Fulfilled';
+          const isHighlighted = req._id === requestId;
 
           return (
             <Animated.View
               key={req._id}
               style={[
                 styles.requestCard,
-                isEmergency && styles.requestCardEmergency,
-                isFulfilled && styles.requestCardFulfilled,
+                isEmergency   && styles.requestCardEmergency,
+                isFulfilled   && styles.requestCardFulfilled,
+                isHighlighted && styles.requestCardHighlighted,
               ]}
             >
               {/* Blood group avatar */}
-              <View style={[styles.bgAvatar, { backgroundColor: isEmergency ? '#FEF2F2' : isFulfilled ? '#ECFDF5' : '#F8FAFC' }]}>
-                <Text style={[styles.bgAvatarText, { color: isEmergency ? '#DC2626' : isFulfilled ? '#059669' : '#475569' }]}>
+              <View style={[
+                styles.bgAvatar,
+                { backgroundColor: isEmergency ? '#FEF2F2' : isFulfilled ? '#ECFDF5' : '#F8FAFC' },
+              ]}>
+                <Text style={[
+                  styles.bgAvatarText,
+                  { color: isEmergency ? '#DC2626' : isFulfilled ? '#059669' : '#475569' },
+                ]}>
                   {req.bloodGroup}
                 </Text>
                 <Text style={styles.bgAvatarUnits}>{req.unitsRequired}u</Text>
@@ -173,10 +324,9 @@ export default function RequestsScreen() {
                   </View>
                 </View>
 
-                {/* Additional notes */}
                 {req.additionalNotes && (
                   <Text style={styles.notes} numberOfLines={2}>
-                    {"“"}{req.additionalNotes}{"”"}
+                    {'\u201c'}{req.additionalNotes}{'\u201d'}
                   </Text>
                 )}
               </View>
@@ -204,17 +354,25 @@ const styles = StyleSheet.create({
   },
   // Tabs
   tab: {
-    paddingHorizontal: 18, paddingVertical: 11,
-    borderRadius: 16, borderWidth: 1,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 999, borderWidth: 1,
     backgroundColor: '#FFFFFF', borderColor: 'rgba(0,0,0,0.08)',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
   },
-  tabActive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
   tabText: { fontSize: 13, fontWeight: '700', color: '#64748B' },
   tabTextActive: { color: '#FFFFFF' },
-  // Empty
+  // Error banner
+  errorBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FEF2F2', borderRadius: 16, marginHorizontal: 24,
+    paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16,
+    borderWidth: 1, borderColor: '#FCA5A5',
+  },
+  errorBannerText: { color: '#DC2626', fontWeight: '600', fontSize: 13, flex: 1 },
+  // Empty state
   emptyState: {
     backgroundColor: '#FFFFFF', borderRadius: 28, padding: 40,
-    alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)', marginTop: 20,
   },
   emptyIconWrap: {
     width: 80, height: 80, borderRadius: 40,
@@ -236,11 +394,9 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   requestCardEmergency: { borderColor: '#FCA5A5', borderWidth: 1.5 },
+  requestCardHighlighted: { borderColor: '#DC2626', borderWidth: 2, backgroundColor: '#FFF5F5' },
   requestCardFulfilled: { opacity: 0.75 },
-  bgAvatar: {
-    width: 60, height: 60, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  bgAvatar: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   bgAvatarText: { fontSize: 17, fontWeight: '900' },
   bgAvatarUnits: { fontSize: 11, color: '#94A3B8', fontWeight: '600', marginTop: 1 },
   patientName: { fontSize: 16, fontWeight: '900', color: '#0F172A', marginBottom: 1 },

@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, ViewStyle } from 'react-native';
 
 /**
  * Returns cross-platform shadow styles.
@@ -11,7 +11,7 @@ export function shadow(
   radius: number,
   opacity: number,
   elevation: number = 4,
-): object {
+): ViewStyle {
   if (Platform.OS === 'web') {
     // Parse hex color to rgb for rgba()
     let r = 0, g = 0, b = 0;
@@ -35,7 +35,14 @@ export function shadow(
 }
 
 /** Pre-built common shadows */
-export const shadows = {
+export const shadows: {
+  sm: ViewStyle;
+  md: ViewStyle;
+  lg: ViewStyle;
+  card: ViewStyle;
+  hero: ViewStyle;
+  red: (intensity?: number) => ViewStyle;
+} = {
   sm: shadow('#0F172A', 2, 4, 0.08, 2),
   md: shadow('#0F172A', 4, 8, 0.12, 4),
   lg: shadow('#0F172A', 8, 16, 0.15, 8),

@@ -13,12 +13,12 @@ import {
 } from 'react-native';
 import { useAppStore } from '../../store/useAppStore';
 import { useRouter } from 'expo-router';
-import { useState, useRef, useEffect } from 'react';
-import { Eye, EyeOff, Phone, Mail, X, Heart } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
+import { Eye, EyeOff, Phone, Mail, X, Heart, Droplet, Link, HeartPulse, LockKeyhole } from 'lucide-react-native';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const { height } = Dimensions.get('window');
+
 
 export default function LoginScreen() {
   const [loginMethod, setLoginMethod] = useState<'mobile' | 'email'>('mobile');
@@ -45,7 +45,7 @@ export default function LoginScreen() {
         Animated.spring(formSlide, { toValue: 0, tension: 60, friction: 9, useNativeDriver: true }),
       ]),
     ]).start();
-  }, []);
+  }, [formOpacity, formSlide, heroScale]);
 
   const { login } = useAppStore();
   const router = useRouter();
@@ -99,9 +99,14 @@ export default function LoginScreen() {
 
           {/* Tagline chips */}
           <View style={styles.heroChipsRow}>
-            {['🩸 Donate', '💙 Connect', '❤️ Save Lives'].map((chip) => (
-              <View key={chip} style={styles.heroChip}>
-                <Text style={styles.heroChipText}>{chip}</Text>
+            {[
+              { label: 'Donate', Icon: Droplet },
+              { label: 'Connect', Icon: Link },
+              { label: 'Save Lives', Icon: HeartPulse },
+            ].map(({ label, Icon }) => (
+              <View key={label} style={styles.heroChip}>
+                <Icon color="rgba(255,255,255,0.9)" size={11} strokeWidth={2.2} />
+                <Text style={styles.heroChipText}>{label}</Text>
               </View>
             ))}
           </View>
@@ -160,7 +165,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
-            leftIcon={<Text style={{ fontSize: 16 }}>🔒</Text>}
+            leftIcon={<LockKeyhole color="#94a3b8" size={18} />}
             rightIcon={
               showPassword
                 ? <EyeOff color="#94a3b8" size={18} />
@@ -328,10 +333,13 @@ const styles = StyleSheet.create({
   heroChip: {
     backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: 999,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   heroChipText: {
     color: 'rgba(255,255,255,0.95)',

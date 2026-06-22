@@ -1,9 +1,84 @@
-import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Animated, StyleSheet } from 'react-native';
 import { useAppStore } from '../../store/useAppStore';
 import { ShieldCheck, Users, MapPin, CheckCircle, XCircle, Calendar, Award } from 'lucide-react-native';
 import { shadow } from '../../utils/shadow';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api from '../../store/api';
+
+/** Animated stat counter card */
+function StatCard({
+  icon,
+  iconBg,
+  borderColor,
+  value,
+  label,
+  delay,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  borderColor: string;
+  value: number;
+  label: string;
+  delay: number;
+}) {
+  const [scale] = useState(() => new Animated.Value(0.8));
+  const [opacity] = useState(() => new Animated.Value(0));
+  const pressScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.spring(scale, { toValue: 1, tension: 80, friction: 7, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [delay, opacity, scale]);
+
+  const handlePressIn = () => {
+    Animated.spring(pressScale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      tension: 150,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={{ flex: 1 }}
+    >
+      <Animated.View style={[styles.statCard, { opacity, transform: [{ scale: Animated.multiply(scale, pressScale) }] }]}>
+        <View style={[
+          styles.statIcon, 
+          { 
+            backgroundColor: iconBg, 
+            borderColor: borderColor, 
+            borderWidth: 1,
+            // Soft shadow for icon
+            shadowColor: borderColor,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 6,
+            elevation: 2,
+          }
+        ]}>{icon}</View>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
 
 const MOCK_DRIVES: any[] = [];
 
@@ -18,7 +93,7 @@ export default function VolunteerDashboard() {
       setLoading(false);
     };
     loadData();
-  }, []);
+  }, [fetchBloodRequests]);
 
   const handleApprove = async (id: string) => {
     try {
@@ -96,27 +171,30 @@ export default function VolunteerDashboard() {
 
       {/* Stats Row */}
       <View className="flex-row px-6 mb-8 gap-4">
-        <View className="flex-1 bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm items-center">
-          <View className="w-12 h-12 bg-emerald-50 rounded-2xl items-center justify-center mb-3">
-            <CheckCircle color="#16A34A" size={20} />
-          </View>
-          <Text className="text-2xl font-black text-slate-900">14</Text>
-          <Text className="text-slate-500 text-xs text-center mt-1">Verified</Text>
-        </View>
-        <View className="flex-1 bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm items-center">
-          <View className="w-12 h-12 bg-purple-50 rounded-2xl items-center justify-center mb-3">
-            <Calendar color="#8B5CF6" size={20} />
-          </View>
-          <Text className="text-2xl font-black text-slate-900">2</Text>
-          <Text className="text-slate-500 text-xs text-center mt-1">Drives</Text>
-        </View>
-        <View className="flex-1 bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm items-center">
-          <View className="w-12 h-12 bg-blue-50 rounded-2xl items-center justify-center mb-3">
-            <Users color="#3B82F6" size={20} />
-          </View>
-          <Text className="text-2xl font-black text-slate-900">{currentUser?.livesSaved}</Text>
-          <Text className="text-slate-500 text-xs text-center mt-1">Lives</Text>
-        </View>
+        <StatCard
+          icon={<CheckCircle color="#16A34A" size={20} />}
+          iconBg="#ECFDF5"
+          borderColor="#A7F3D0"
+          value={14}
+          label="Verified"
+          delay={0}
+        />
+        <StatCard
+          icon={<Calendar color="#8B5CF6" size={20} />}
+          iconBg="#F5F3FF"
+          borderColor="#D8B4FE"
+          value={2}
+          label="Drives"
+          delay={80}
+        />
+        <StatCard
+          icon={<Users color="#3B82F6" size={20} />}
+          iconBg="#EFF6FF"
+          borderColor="#BFDBFE"
+          value={currentUser?.livesSaved ?? 0}
+          label="Lives"
+          delay={160}
+        />
       </View>
 
       {/* Pending Verifications */}
@@ -182,7 +260,7 @@ export default function VolunteerDashboard() {
                 <MapPin color="#94a3b8" size={14} />
                 <Text className="text-slate-500 text-sm ml-1.5">{drive.location}</Text>
               </View>
-              <Text className="text-slate-400 text-xs mb-4">📅 {drive.date}</Text>
+              <Text className="text-slate-400 text-xs mb-4">{drive.date}</Text>
               <View className="flex-row items-center justify-between">
                 <View className="flex-1 bg-slate-100 rounded-full h-2 mr-4">
                   <View
@@ -199,3 +277,40 @@ export default function VolunteerDashboard() {
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  statIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+});

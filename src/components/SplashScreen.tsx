@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Animated, Image, Dimensions, Text } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 export default function SplashScreen({ onFinish }: { onFinish: () => void }) {
   // Core animations
@@ -79,7 +79,21 @@ export default function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
     const timer = setTimeout(onFinish, 2800);
     return () => clearTimeout(timer);
-  }, []);
+  }, [
+    circleOpacity1,
+    circleOpacity2,
+    circleScale1,
+    circleScale2,
+    logoOpacity,
+    logoScale,
+    pulseScale,
+    pulseOpacity,
+    textOpacity,
+    textY,
+    taglineOpacity,
+    dotOpacity,
+    onFinish,
+  ]);
 
   return (
     <View style={styles.container}>

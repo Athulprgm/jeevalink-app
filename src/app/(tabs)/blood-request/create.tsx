@@ -5,11 +5,12 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
-import { ChevronLeft, Check } from 'lucide-react-native';
+import { ChevronLeft, Check, Siren, BellRing, ShieldCheck, CircleCheck, Circle } from 'lucide-react-native';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -17,9 +18,27 @@ const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const URGENCY_LEVELS = ['Normal', 'Urgent', 'Emergency SOS'] as const;
 
 const URGENCY_CONFIG = {
-  'Normal': { label: '✅ Normal', bg: '#ECFDF5', text: '#059669', activeBg: '#059669' },
-  'Urgent': { label: '⚡ Urgent', bg: '#FFFBEB', text: '#D97706', activeBg: '#D97706' },
-  'Emergency SOS': { label: '🚨 Emergency SOS', bg: '#FEF2F2', text: '#DC2626', activeBg: '#DC2626' },
+  'Normal': {
+    icon: ShieldCheck,
+    iconColor: '#10B981',
+    accentColor: '#10B981',
+    title: 'Normal',
+    desc: 'Standard donor matching',
+  },
+  'Urgent': {
+    icon: BellRing,
+    iconColor: '#F59E0B',
+    accentColor: '#F59E0B',
+    title: 'Urgent',
+    desc: 'High priority notification',
+  },
+  'Emergency SOS': {
+    icon: Siren,
+    iconColor: '#FFFFFF',
+    accentColor: '#DC2626',
+    title: 'SOS',
+    desc: 'Siren broadcast alert',
+  },
 };
 
 const SectionLabel = ({ children }: { children: string }) => (
@@ -139,23 +158,60 @@ export default function CreateBloodRequestScreen() {
 
         {/* Request Urgency */}
         <SectionLabel>Request Urgency *</SectionLabel>
-        <View className="flex-row gap-3 mb-8">
+        <View style={urgencyStyles.list}>
           {URGENCY_LEVELS.map((u) => {
             const cfg = URGENCY_CONFIG[u];
             const isActive = urgencyLevel === u;
+            const UrgencyIcon = cfg.icon;
+            const isSOS = u === 'Emergency SOS';
             return (
               <TouchableOpacity
                 key={u}
-                className="flex-1 py-4 rounded-[16px] border items-center"
-                style={{
-                  backgroundColor: isActive ? cfg.activeBg : '#fff',
-                  borderColor: isActive ? cfg.activeBg : 'rgba(0,0,0,0.08)',
-                }}
+                style={[
+                  urgencyStyles.card,
+                  isSOS && isActive && urgencyStyles.cardSOS,
+                  !isSOS && isActive && { borderColor: cfg.accentColor, borderWidth: 1.5 },
+                ]}
                 onPress={() => setUrgencyLevel(u)}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${u} urgency`}
               >
-                <Text className="text-[13px] font-black text-center" style={{ color: isActive ? '#fff' : cfg.text }}>
-                  {u === 'Emergency SOS' ? '🚨\nSOS' : u === 'Urgent' ? '⚡\nUrgent' : '✅\nNormal'}
-                </Text>
+                <View
+                  style={[
+                    urgencyStyles.iconWrap,
+                    isSOS
+                      ? { backgroundColor: 'rgba(255,255,255,0.18)' }
+                      : { backgroundColor: `${cfg.accentColor}18` },
+                  ]}
+                >
+                  <UrgencyIcon
+                    color={isSOS ? '#FFFFFF' : cfg.iconColor}
+                    size={18}
+                    strokeWidth={2.2}
+                  />
+                </View>
+                <View style={urgencyStyles.textWrap}>
+                  <Text
+                    style={[
+                      urgencyStyles.title,
+                      isSOS && urgencyStyles.titleSOS,
+                    ]}
+                  >
+                    {cfg.title}
+                  </Text>
+                  <Text
+                    style={[
+                      urgencyStyles.desc,
+                      isSOS && urgencyStyles.descSOS,
+                    ]}
+                  >
+                    {cfg.desc}
+                  </Text>
+                </View>
+                {isActive
+                  ? <CircleCheck color={isSOS ? '#FFFFFF' : cfg.accentColor} size={20} strokeWidth={2.5} />
+                  : <Circle color="#CBD5E1" size={20} strokeWidth={1.5} />
+                }
               </TouchableOpacity>
             );
           })}
@@ -270,3 +326,53 @@ export default function CreateBloodRequestScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const urgencyStyles = StyleSheet.create({
+  list: { gap: 10, marginBottom: 28 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  cardSOS: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
+    shadowColor: '#DC2626',
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textWrap: { flex: 1 },
+  title: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+    letterSpacing: -0.2,
+  },
+  titleSOS: { color: '#FFFFFF' },
+  desc: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  descSOS: { color: 'rgba(255,255,255,0.72)' },
+});

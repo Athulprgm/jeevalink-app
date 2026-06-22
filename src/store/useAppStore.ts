@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import api from './api';
 
+export type ThemePreference = 'Light' | 'Dark' | 'System';
+
 // ─── Interfaces ────────────────────────────────────────────────────────────────
 
 export interface User {
@@ -16,6 +18,9 @@ export interface User {
   city: string;
   district: string;
   address?: string;
+  pincode?: string;
+  idProofFront?: string;
+  idProofBack?: string;
   weight?: number;
   dateOfBirth?: string;
   lastDonatedDate?: string;
@@ -35,12 +40,15 @@ export interface BloodRequest {
   hospitalName: string;
   hospitalAddress?: string;
   location: string;
+  district?: string;
+  city?: string;
   contactNumber: string;
   contactPersonName?: string;
   requiredByDate?: string;
   urgencyLevel: 'Normal' | 'Urgent' | 'Emergency SOS';
   additionalNotes?: string;
   status: 'Pending' | 'Fulfilled';
+  requestedBy?: string;
   createdAt: string;
   verified?: boolean;
 }
@@ -62,6 +70,9 @@ interface AppState {
   
   setCurrentUser: (user: User | null) => void;
   updateUser: (updates: Partial<User>) => void;
+  
+  themePreference: ThemePreference;
+  setThemePreference: (theme: ThemePreference) => void;
   
   // Auth methods
   login: (credential: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -89,7 +100,10 @@ interface AppState {
 
   // Donors
   donors: User[];
-  searchDonors: (params?: { bloodGroup?: string; district?: string; city?: string }) => Promise<void>;
+  searchDonors: (params?: { bloodGroup?: string; district?: string; city?: string; pincode?: string }) => Promise<void>;
+  liveDonorCounts: Record<string, number>;
+  fetchLiveCounts: () => Promise<void>;
+  acceptBloodRequest: (id: string) => Promise<{ success: boolean; error?: string }>;
   
   _hasHydrated: boolean;
   setHasHydrated: (state: boolean) => void;
@@ -118,9 +132,12 @@ export const useAppStore = create<AppState>()(
       token: null,
       loading: false,
       error: null,
+      liveDonorCounts: {},
+      themePreference: 'System',
       _hasHydrated: false,
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
+      setThemePreference: (theme) => set({ themePreference: theme }),
       setCurrentUser: (user) => set({ currentUser: user }),
       updateUser: (updates) =>
         set((state) => ({
@@ -145,7 +162,10 @@ export const useAppStore = create<AppState>()(
       register: async (userData) => {
         set({ loading: true, error: null });
         try {
-          const res = await api.post('/auth/register', userData);
+          const isFormData = userData instanceof FormData;
+          const res = await api.post('/auth/register', userData, isFormData ? {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          } : undefined);
           const { token, user } = res.data.data;
           set({ token, currentUser: user, loading: false });
           return { success: true };
@@ -230,7 +250,23 @@ export const useAppStore = create<AppState>()(
         
       createBloodRequest: async (requestData) => {
         try {
-          const res = await api.post('/requests', requestData);
+          // Backend expects snake_case field names
+          const payload = {
+            patient_name: requestData.patientName,
+            blood_group: requestData.bloodGroup,
+            units_required: requestData.unitsRequired,
+            hospital_name: requestData.hospitalName,
+            hospital_address: requestData.hospitalAddress,
+            location: requestData.location,
+            city: requestData.city,
+            district: requestData.district,
+            contact_number: requestData.contactNumber,
+            contact_person_name: requestData.contactPersonName,
+            required_by_date: requestData.requiredByDate,
+            urgency_level: requestData.urgencyLevel,
+            additional_notes: requestData.additionalNotes,
+          };
+          const res = await api.post('/requests', payload);
           if (res.data.success) {
             const newReq = res.data.data.request;
             set((state) => ({ bloodRequests: [newReq, ...state.bloodRequests] }));
@@ -309,7 +345,7 @@ export const useAppStore = create<AppState>()(
           if (res.data.success) {
             set((state) => ({
               notifications: state.notifications.map((n) =>
-                n._id === id ? { ...n, read: true } : n
+                n._id === id ? { ...n, read: true, isRead: true } : n
               ),
             }));
           }
@@ -324,7 +360,7 @@ export const useAppStore = create<AppState>()(
           const res = await api.patch('/notifications/read-all');
           if (res.data.success) {
             set((state) => ({
-              notifications: state.notifications.map((n) => ({ ...n, read: true })),
+              notifications: state.notifications.map((n) => ({ ...n, read: true, isRead: true })),
             }));
           }
         } catch (err: any) {
@@ -347,12 +383,46 @@ export const useAppStore = create<AppState>()(
           if (params?.city) {
             queryParams.city = params.city;
           }
+          if (params?.pincode) {
+            queryParams.pincode = params.pincode;
+          }
           const res = await api.get('/donors/search', { params: queryParams });
           if (res.data.success) {
             set({ donors: res.data.data.donors || [] });
           }
         } catch (err: any) {
           if (err?.response?.status !== 401) console.error('Failed to search donors', err);
+        }
+      },
+
+      fetchLiveCounts: async () => {
+        if (!get().token) return;
+        try {
+          const res = await api.get('/donors/live-count');
+          if (res.data.success) {
+            set({ liveDonorCounts: res.data.data.counts || {} });
+          }
+        } catch (err: any) {
+          if (err?.response?.status !== 401) console.error('Failed to fetch live donor counts', err);
+        }
+      },
+
+      acceptBloodRequest: async (id) => {
+        try {
+          const res = await api.patch(`/requests/${id}/accept`);
+          if (res.data.success) {
+            const updatedReq = res.data.data.request;
+            set((state) => ({
+              bloodRequests: state.bloodRequests.map((r) =>
+                r._id === id ? updatedReq : r
+              ),
+            }));
+            return { success: true };
+          }
+          return { success: false };
+        } catch (err: any) {
+          const errMsg = err.response?.data?.message || 'Failed to accept blood request.';
+          return { success: false, error: errMsg };
         }
       },
     }),
@@ -364,6 +434,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         currentUser: state.currentUser,
         token: state.token,
+        themePreference: state.themePreference,
       }),
       onRehydrateStorage: (state) => {
         return (state, error) => {

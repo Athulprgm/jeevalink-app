@@ -1,44 +1,37 @@
-import { Tabs } from 'expo-router';
-import { View, StyleSheet, Platform } from 'react-native';
-import { Home, Search, Droplet, Bell, User, Settings } from 'lucide-react-native';
+import { Tabs, router } from 'expo-router';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { Home, Search, Bell, Droplet, User, Settings, Plus } from 'lucide-react-native';
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#DC2626',
-        tabBarInactiveTintColor: '#94A3B8',
+        tabBarInactiveTintColor: '#757575',
+        tabBarActiveTintColor: '#E53935',
         tabBarShowLabel: true,
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: '700',
-          marginTop: 2,
-          letterSpacing: 0.2,
+          fontWeight: '600',
+          marginTop: 4,
+          marginBottom: Platform.OS === 'ios' ? 0 : 4,
         },
         tabBarStyle: {
-          position: 'absolute',
-          bottom: 16,
-          left: 16,
-          right: 16,
-          height: 72,
-          borderRadius: 28,
-          backgroundColor: 'rgba(255,255,255,0.97)',
-          borderTopWidth: 0,
-          borderWidth: 1,
-          borderColor: 'rgba(0,0,0,0.06)',
-          paddingBottom: 10,
-          paddingTop: 10,
-          // Premium multi-layer shadow
+          height: Platform.OS === 'ios' ? 88 : 72,
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderColor: '#F0F0F0',
+          paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+          paddingTop: 8,
+          // Light top shadow
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.12,
-          shadowRadius: 24,
-          elevation: 24,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 8,
+          elevation: 10,
         },
         tabBarItemStyle: {
-          borderRadius: 16,
-          marginHorizontal: 2,
+          height: 52,
         },
       }}
     >
@@ -47,9 +40,7 @@ export default function TabsLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIconWrap : styles.iconWrap}>
-              <Home color={color} size={22} strokeWidth={focused ? 2.2 : 1.8} />
-            </View>
+            <Home color={color} size={24} strokeWidth={focused ? 2.5 : 2} fill={focused ? '#E53935' : 'none'} />
           ),
         }}
       />
@@ -58,25 +49,7 @@ export default function TabsLayout() {
         options={{
           title: 'Find',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIconWrap : styles.iconWrap}>
-              <Search color={color} size={22} strokeWidth={focused ? 2.2 : 1.8} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="alerts"
-        options={{
-          title: 'Requests',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIconWrap : styles.iconWrap}>
-              <Droplet
-                color={color}
-                size={22}
-                strokeWidth={focused ? 2.2 : 1.8}
-                fill={focused ? color : 'none'}
-              />
-            </View>
+            <Search color={color} size={24} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
@@ -85,9 +58,50 @@ export default function TabsLayout() {
         options={{
           title: 'Alerts',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIconWrap : styles.iconWrap}>
-              <Bell color={color} size={22} strokeWidth={focused ? 2.2 : 1.8} />
+            <Bell color={color} size={24} strokeWidth={focused ? 2.5 : 2} fill={focused ? '#E53935' : 'none'} />
+          ),
+        }}
+      />
+      
+      {/* CENTER FAB: Emergency */}
+      <Tabs.Screen
+        name="blood-request/emergency"
+        options={{
+          title: 'Emergency',
+          tabBarLabelStyle: { color: '#E53935', fontSize: 10, fontWeight: '700', marginTop: 4, marginBottom: Platform.OS === 'ios' ? 0 : 4 },
+          tabBarIcon: ({ focused }) => (
+            <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{
+                position: 'absolute',
+                bottom: -8, // Shifts the circle up outside the bar while maintaining label alignment
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 58,
+                height: 58,
+                borderRadius: 29,
+                backgroundColor: '#E53935',
+                shadowColor: '#E53935',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.35,
+                shadowRadius: 10,
+                elevation: 8,
+              }}>
+                <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                  <Droplet color="#FFFFFF" size={28} strokeWidth={2.5} fill="#FFFFFF" />
+                  <Plus color="#E53935" size={14} strokeWidth={4} style={{ position: 'absolute', marginTop: 4 }} />
+                </View>
+              </View>
             </View>
+          ),
+        }}
+      />
+      
+      <Tabs.Screen
+        name="alerts"
+        options={{
+          title: 'Requests',
+          tabBarIcon: ({ color, focused }) => (
+            <Droplet color={color} size={24} strokeWidth={focused ? 2.5 : 2} fill={focused ? '#E53935' : 'none'} />
           ),
         }}
       />
@@ -96,9 +110,7 @@ export default function TabsLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIconWrap : styles.iconWrap}>
-              <User color={color} size={22} strokeWidth={focused ? 2.2 : 1.8} />
-            </View>
+            <User color={color} size={24} strokeWidth={focused ? 2.5 : 2} fill={focused ? '#E53935' : 'none'} />
           ),
         }}
       />
@@ -107,32 +119,15 @@ export default function TabsLayout() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIconWrap : styles.iconWrap}>
-              <Settings color={color} size={22} strokeWidth={focused ? 2.2 : 1.8} />
-            </View>
+            <Settings color={color} size={24} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
+      
       {/* Hidden screens */}
       <Tabs.Screen name="blood-request/create" options={{ href: null }} />
+      <Tabs.Screen name="blood-request/history" options={{ href: null }} />
     </Tabs>
   );
 }
 
-const styles = StyleSheet.create({
-  iconWrap: {
-    width: 36,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
-  activeIconWrap: {
-    width: 44,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: '#FEF2F2',
-  },
-});

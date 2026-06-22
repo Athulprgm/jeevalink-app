@@ -17,6 +17,9 @@ export function toCamel(obj: any): any {
     if (result.id !== undefined && result._id === undefined) {
       result._id = String(result.id);
     }
+    if (result.isRead !== undefined) {
+      result.read = result.isRead;
+    }
     if (result.lastDonatedDate !== undefined) {
       result.lastDonated = result.lastDonatedDate;
       result.lastDonationDate = result.lastDonatedDate;
@@ -60,6 +63,8 @@ export function toSnake(obj: any): any {
         snakeKey = 'mobile';
       } else if (key === '_id') {
         snakeKey = 'id';
+      } else if (key === 'read') {
+        snakeKey = 'is_read';
       } else {
         snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
       }
